@@ -16,18 +16,7 @@ import pandas as pd
 crypten.init()
 
 torch.set_num_threads(1)
-x_enc = crypten.cryptensor([20], ptype=crypten.mpc.arithmetic ,src =0)
 
-x_enc_binary = x_enc.to(crypten.mpc.binary)
-
-x_enc = x_enc.square()
-
-print(x_enc.get_plain_text())
-y_enc_binary = crypten.cryptensor([20],src =0)
-print(y_enc_binary)
-com = x_enc.gt(y_enc_binary)
-print(com)
-print(com.get_plain_text())
 
 dataset=pd.read_csv('Mall_Customers.csv')
 
@@ -57,6 +46,7 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
     # of randon initiialization
     for point_index in range(len(enc_dataset)):
         distance = []
+        distance_enc = []
         for index, cluster in enumerate(clusters):
             #print("squared")
             # print("vinayak")
@@ -70,9 +60,9 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
             #print(squared.get_plain_text())
 
             #squared = convert._A2B(squared)  # Convert tensor to Binary shared tensor for comparison
-            distance.append((squared, index))
+            distance.append(squared)
 
-        smallest,smallest_index = distance[0][0], distance[0][1]
+        smallest = distance[0]
         # print(distance[0][0].get_plain_text())
         for i in range(len(distance)):
             # print(" ")
@@ -83,12 +73,12 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
             # print("distance encrypted"+ str(distance[i][0]))
             # #print(smallest)
             # print("smaleest encrypted"+ str(smallest))
-            comparison = smallest.lt(distance[i][0])
+            comparison = smallest.lt(distance[i])
             #comparison=comparison.get_plain_text()
             #print("comparison "+ str(comparison))
 
             if comparison.get_plain_text() <= 0:
-                smallest_index = distance[i][1]
+                smallest_index = distance[i]
             #smallest = distance[i][0]
 
             one = crypten.cryptensor(torch.Tensor([1]))
@@ -97,7 +87,7 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
             #print("result1"+ str(result1.get_plain_text()))
             result2 = one.sub(comparison)
             #print(result2)
-            result2 = result2.mul(distance[i][0])
+            result2 = result2.mul(distance[i])
             #print("result2"+ str(result2))
             smallest = result1.add(result2)
             #print("smallles"+ str(smallest.get_plain_text()))
@@ -112,6 +102,14 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
         # print(smallest.get_plain_text())
         # print(smallest_index)
         #smallest = convert._B2A(smallest)  # convert tensor back to Arthimatic shared tensor
+        distance_in_tensor = MPCTensor.stack(distance)
+        smallest_index = 0
+        indices = distance_in_tensor.argmin().reveal()      #this just converts Artihmatic tensor to tnesor with encrpyted values intact,
+        #print(indices)                                     # no decrpytion happen here
+        for index, value in enumerate(indices):
+            if value ==1:
+                smallest_index = index
+
         if enc_dataset[point_index][1] != -1:
             clusters[enc_dataset[point_index][1]]['elements'].remove(enc_dataset[point_index][0])
         clusters[int(smallest_index)]['elements'].append(enc_dataset[point_index][0])
@@ -161,4 +159,3 @@ plt.xlabel('Annual Income (k$)')
 plt.ylabel('Spending Score (1-100)')
 plt.legend()
 plt.show()
-
