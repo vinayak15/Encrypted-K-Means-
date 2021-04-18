@@ -3,13 +3,31 @@ from crypten.mpc.primitives.binary import BinarySharedTensor
 from crypten.mpc.primitives.arithmetic import ArithmeticSharedTensor
 import crypten.mpc.primitives.circuit
 import sys
+from crypten.mpc import MPCTensor
+
+import crypten
 import crypten.communicator as comm
 import crypten.mpc.primitives.converters  as convert
 import numpy as np
 import matplotlib.pyplot as plt
+import crypten.mpc as mpc
+import crypten.communicator as comm
 import pandas as pd
 crypten.init()
 
+torch.set_num_threads(1)
+x_enc = crypten.cryptensor([20], ptype=crypten.mpc.arithmetic ,src =0)
+
+x_enc_binary = x_enc.to(crypten.mpc.binary)
+
+x_enc = x_enc.square()
+
+print(x_enc.get_plain_text())
+y_enc_binary = crypten.cryptensor([20],src =0)
+print(y_enc_binary)
+com = x_enc.gt(y_enc_binary)
+print(com)
+print(com.get_plain_text())
 
 dataset=pd.read_csv('Mall_Customers.csv')
 
@@ -28,7 +46,7 @@ if k > len(X):
 
 enc_dataset = []
 for x in X:
-    tensor = ArithmeticSharedTensor(x)
+    tensor = crypten.cryptensor(x)
     enc_dataset.append((tensor, -1))
 
 clusters = [dict() for x in range(k)]
@@ -46,9 +64,9 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
             # print(cluster['coordinate'].get_plain_text())
             substracted_tensor = enc_dataset[point_index][0].sub(cluster['coordinate'])
             # print(substracted_tensor.get_plain_text())
-            squared = substracted_tensor.mul(substracted_tensor)
+            squared = substracted_tensor.square()
             #print(squared)
-            squared = squared[0].add(squared[1])
+            squared = squared.sum()
             #print(squared.get_plain_text())
 
             #squared = convert._A2B(squared)  # Convert tensor to Binary shared tensor for comparison
@@ -65,28 +83,25 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
             # print("distance encrypted"+ str(distance[i][0]))
             # #print(smallest)
             # print("smaleest encrypted"+ str(smallest))
-            comparison = smallest.sub(distance[i][0])
-            comparison=comparison.get_plain_text()
+            comparison = smallest.lt(distance[i][0])
+            #comparison=comparison.get_plain_text()
             #print("comparison "+ str(comparison))
 
-            if comparison > 0:
+            if comparison.get_plain_text() <= 0:
                 smallest_index = distance[i][1]
-                smallest = distance[i][0]
-            # one = ArithmeticSharedTensor(torch.Tensor([1]))
-            # comparison = convert._B2A(comparison)
+            #smallest = distance[i][0]
 
-            # smallest = convert._B2A(smallest)
-            # current_distance = convert._B2A(distance[i][0])
-            # result1 = comparison.mul(smallest)
-            # print("result1"+ str(result1.get_plain_text()))
-            # result2 = one.sub(comparison)
-            # #print(result2)
-            # result2 = result2.mul(current_distance)
-            # print("result2"+ str(result2))
-            # smallest = result1.add(result2)
-            # smallest = convert._A2B(smallest)
-            # print("smallles"+ str(smallest.get_plain_text()))
-            # #print(smallest.get_plain_text())
+            one = crypten.cryptensor(torch.Tensor([1]))
+
+            result1 = comparison.mul(smallest)
+            #print("result1"+ str(result1.get_plain_text()))
+            result2 = one.sub(comparison)
+            #print(result2)
+            result2 = result2.mul(distance[i][0])
+            #print("result2"+ str(result2))
+            smallest = result1.add(result2)
+            #print("smallles"+ str(smallest.get_plain_text()))
+            #print(smallest.get_plain_text())
             # smallest_index = ArithmeticSharedTensor(smallest_index)
             # result1 = comparison.mul(smallest_index)
             # result2 = one.sub(comparison)
@@ -106,7 +121,7 @@ for iteration in range(max_epoch):  # around 100 epochs for convergence because
     #     print(clusters[x]['coordinate'].get_plain_text())
     #     [print(y.get_plain_text()) for y in clusters[x]['elements']]
     for cluster in clusters:
-        x = ArithmeticSharedTensor(torch.Tensor([0, 0]))
+        x = crypten.cryptensor(torch.Tensor([0, 0]))
         for data in cluster['elements']:
             x = x.add(data)
         if len(cluster['elements']) !=0:
