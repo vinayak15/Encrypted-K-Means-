@@ -1,4 +1,5 @@
 import sys
+import random as rd
 
 import logging
 import crypten
@@ -9,13 +10,55 @@ import torch
 from crypten.mpc import MPCTensor
 
 
-def train_kmeans(enc_dataset , max_epoch, k):
-    clusters = [dict() for x in range(k)]
-    for x in range(k):
-        clusters[x]['coordinate'] = enc_dataset[x][0]  # initiallize the clusters with random data points
-        clusters[x]['elements'] = []
+def kmeanspp(enc_dataset, K):
+    clusters = [dict() for x in range(K)]
+    i = rd.randint(0, len(enc_dataset))
+
+    clusters[0]['coordinate'] = enc_dataset[i][0]
+    clusters[0]['elements'] = []
+    for k in range(1, K):
+        distance_list = []
+        for point in enc_dataset:
+            minimum_centroid_distance = []
+            #print(k)
+            for index in range(k):
+                #print(point[0].get_plain_text())
+                diff = clusters[index]['coordinate'].sub(point[0])
+                diff = diff.square()
+                x = diff.sum()
+                minimum_centroid_distance.append(x)
+            minimum_centroid_distance = MPCTensor.stack(minimum_centroid_distance)
+            #print("vinayak")
+            #print(minimum_centroid_distance.get_plain_text())
+            indices = minimum_centroid_distance.min()
+            #print(indices.get_plain_text())
+            distance_list.append(indices)
+        distance_list = MPCTensor.stack(distance_list)
+        maximum_distance_index = distance_list.argmax().reveal()
+        smallest_index =-1
+        #print(crypten.communicator.get().get_rank())
+        # if crypten.communicator.get().get_rank() == 0:
+        #     print(maximum_distance_index)
+        for index, value in enumerate(maximum_distance_index):
+            if value == 1:
+                smallest_index = index
+        clusters[k]['coordinate'] = enc_dataset[smallest_index][0]
+        clusters[k]['elements'] =[]
+
+    return clusters
+
+
+def train_kmeans(enc_dataset, max_epoch, k):
+    # clusters = [dict() for x in range(k)]
+    # for x in range(k):
+    #     clusters[x]['coordinate'] = enc_dataset[x][0]  # initiallize the clusters with random data points
+    #     clusters[x]['elements'] = []
+
+    clusters = kmeanspp(enc_dataset, k)  # kmeans ++ initialization so that cluster are corectly formed
+    # if crypten.communicator.get().get_rank() == 0:
+    #     print(clusters)
     for iteration in range(max_epoch):  # around 100 epochs for convergence because
-                                        # of randon initiialization
+        # of randon initiialization
         for point_index in range(len(enc_dataset)):
             distance = []
             for index, cluster in enumerate(clusters):
@@ -61,12 +104,14 @@ def train_kmeans(enc_dataset , max_epoch, k):
 
     return clusters
 
-def decrypt_clusters(clusters ,k):
+
+def decrypt_clusters(clusters, k):
     un_enctyped_clusters = [dict() for x in range(k)]
     for x in range(k):
         un_enctyped_clusters[x]['coordinate'] = clusters[x]['coordinate'].get_plain_text()
         un_enctyped_clusters[x]['elements'] = [y.get_plain_text() for y in clusters[x]['elements']]
     return un_enctyped_clusters
+
 
 def verify_clusters(un_enctyped_clusters):
     color_total = ['red', 'blue', 'green', 'cyan', 'magenta', 'yellow', 'black', 'white']
@@ -97,14 +142,23 @@ def verify_clusters(un_enctyped_clusters):
     plt.show()
 
 
+def print_dataset(X):
+    plt.scatter(X[:, 0], X[:, 1], c='black', label='unclustered data')
+    plt.xlabel('Income')
+    plt.ylabel('Number of transactions')
+    plt.legend()
+    plt.title('Plot of data points')
+    plt.show()
 
-def run_mpc_kmeans(epochs=5, input_path=None, k=2, skip_plaintext=False, rank=0):
+
+def run_mpc_kmeans(epochs=5, input_path=None, k=2, skip_plaintext=False, rank='0'):
     crypten.init()
     torch.manual_seed(1)
-
     dataset = pd.read_csv(input_path)
     X = dataset.iloc[:, [3, 4]].values
     dataset.describe()
+
+    #print_dataset(X)
 
     if k > len(X):
         print("K means not possible as cluster is greater than  dataset")
@@ -116,18 +170,20 @@ def run_mpc_kmeans(epochs=5, input_path=None, k=2, skip_plaintext=False, rank=0)
         tensor = crypten.cryptensor(x)
         enc_dataset.append((tensor, -1))
 
+
     logging.info("==================")
     logging.info("CrypTen K Means  Training")
     logging.info("==================")
-    clusters = train_kmeans(enc_dataset, epochs, k )
+    clusters = train_kmeans(enc_dataset, epochs, k)
+    if crypten.communicator.get().get_rank() == 0:
+        logging.info("==================")
+        logging.info("Decrypting Clusters ")
+        logging.info("==================")
+    decrypted_clusters = decrypt_clusters(clusters, k)
 
 
-    logging.info("==================")
-    logging.info("Decrypting Clusters ")
-    logging.info("==================")
-    decrypted_clusters= decrypt_clusters(clusters, k)
-
-    logging.info("==================")
-    logging.info("Printing  Clusters ")
-    logging.info("==================")
-    verify_clusters(decrypted_clusters)
+    if crypten.communicator.get().get_rank() == 0:
+        logging.info("==================")
+        logging.info("Printing  Clusters ")
+        logging.info("==================")
+        verify_clusters(decrypted_clusters)
