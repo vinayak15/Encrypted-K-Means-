@@ -68,20 +68,6 @@ def train_kmeans(enc_dataset, max_epoch, k):
 
                 distance.append(squared)
 
-            smallest = distance[0]
-            for i in range(len(distance)):
-                comparison = smallest.lt(distance[i])
-
-                if comparison.get_plain_text() <= 0:
-                    smallest_index = distance[i]
-
-                one = crypten.cryptensor(torch.Tensor([1]))
-
-                result1 = comparison.mul(smallest)
-                result2 = one.sub(comparison)
-                result2 = result2.mul(distance[i])
-
-                smallest = result1.add(result2)
             distance_in_tensor = MPCTensor.stack(distance)
             smallest_index = 0
             indices = distance_in_tensor.argmin().reveal()  # this just converts Artihmatic tensor to tnesor with encrpyted values intact,
