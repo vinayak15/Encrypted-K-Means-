@@ -1,9 +1,9 @@
 # Encrypted-K-Means-
-Instruction to Run Code
-	1) Clone https://github.com/facebookresearch/CrypTen repository 
-	2) Enter inside this repository
-	3) pip3 install .
-	4) pip install matplotlib
+Instruction to Run Code 
+1) Clone https://github.com/facebookresearch/CrypTen repository
+2) Enter inside this repository
+3) pip3 install .
+4) pip install matplotlib
 	
 Copy code menitoned in this repository
 launcher.py launches Encrpyted K Means and main.py launches normal K means
@@ -14,5 +14,5 @@ Results between encrypted K means and non encrpyted  K means can be compared by 
 
 For rank > 2 our code is currently in development.
 
-FOr proper results of our program please check our report.
-If you find any discrepency please let me know and you can contact me on my email vothar3@asu.edu
+For proper results of our program please check our report.
+If you find any discrepency please let me know and you can contact me on my email vkothar3@asu.edu
